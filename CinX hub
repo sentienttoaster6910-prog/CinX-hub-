@@ -1,0 +1,595 @@
+--// CinX Hub - Clean & Modular GUI by McNoobstaer \\--
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- Track coroutines
+local activeCoroutines = {}
+
+-- Draggable function
+local function makeDraggable(frame)
+    frame.Active = true
+    local dragging, dragInput, dragStart, startPos
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    frame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+end
+
+-- Stop all coroutines
+local function stopActiveCoroutines()
+    for _, co in pairs(activeCoroutines) do
+        coroutine.close(co)
+    end
+    activeCoroutines = {}
+end
+
+-- Create features (button or textbox)
+local function createFeature(page, name, isButton)
+    local y = (#page:GetChildren()) * 40 -- Auto-stack
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0,500,0,35)
+    frame.Position = UDim2.new(0,50,0,y)
+    frame.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    frame.Parent = page
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0,10)
+    corner.Parent = frame
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0,200,1,0)
+    label.Position = UDim2.new(0,5,0,0)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(255,255,255)
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 14
+    label.Text = name
+    label.Parent = frame
+
+    if isButton then
+        local button = Instance.new("TextButton")
+        button.Size = UDim2.new(0,150,0,25)
+        button.Position = UDim2.new(1,-160,0,5)
+        button.Text = name
+        button.TextColor3 = Color3.fromRGB(255,255,255)
+        button.BackgroundColor3 = Color3.fromRGB(50,50,50)
+        button.Parent = frame
+        return frame, button
+    else
+        local box = Instance.new("TextBox")
+        box.Size = UDim2.new(0,150,0,25)
+        box.Position = UDim2.new(1,-160,0,5)
+        box.PlaceholderText = "Value"
+        box.TextColor3 = Color3.fromRGB(255,255,255)
+        box.BackgroundColor3 = Color3.fromRGB(50,50,50)
+        box.Parent = frame
+        return frame, box
+    end
+end
+
+-- GUI setup
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "CinX"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = playerGui
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0,600,0,400)
+mainFrame.Position = UDim2.new(0.5,-300,0.5,-200)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+mainFrame.Visible = false
+mainFrame.Parent = screenGui
+makeDraggable(mainFrame)
+
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0,15)
+mainCorner.Parent = mainFrame
+
+local mainGradient = Instance.new("UIGradient")
+mainGradient.Color = ColorSequence.new(Color3.fromRGB(255,0,0), Color3.fromRGB(0,0,0))
+mainGradient.Rotation = 90
+mainGradient.Parent = mainFrame
+
+local header = Instance.new("TextLabel")
+header.Size = UDim2.new(1,0,0,30)
+header.Position = UDim2.new(0,0,0,0)
+header.BackgroundTransparency = 1
+header.Text = "CinX - By McNoobstaer (Wieldedstud/pupking139)"
+header.TextColor3 = Color3.fromRGB(255,255,255)
+header.Font = Enum.Font.GothamBold
+header.TextSize = 16
+header.Parent = mainFrame
+
+-- Tab bar & holder
+local tabBar = Instance.new("Frame")
+tabBar.Size = UDim2.new(1,0,0,35)
+tabBar.Position = UDim2.new(0,0,0,30)
+tabBar.BackgroundTransparency = 1
+tabBar.Parent = mainFrame
+
+local tabHolder = Instance.new("Frame")
+tabHolder.Size = UDim2.new(1,0,1,-65)
+tabHolder.Position = UDim2.new(0,0,0,65)
+tabHolder.BackgroundTransparency = 1
+tabHolder.Parent = mainFrame
+
+-- Tabs
+local tabNames = {"Player","Teleport","World","Visuals","Fun","Admin","Executor","Misc"}
+local tabs, pages = {}, {}
+
+for i, name in ipairs(tabNames) do
+    local tabButton = Instance.new("TextButton")
+    tabButton.Size = UDim2.new(0, math.floor(600/#tabNames),1,0)
+    tabButton.Position = UDim2.new((i-1)/#tabNames,0,0,0)
+    tabButton.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    tabButton.TextColor3 = Color3.fromRGB(255,255,255)
+    tabButton.Text = name
+    tabButton.Font = Enum.Font.GothamBold
+    tabButton.TextSize = 14
+    tabButton.Parent = tabBar
+
+    local page = Instance.new("ScrollingFrame")
+    page.Size = UDim2.new(1,0,1,0)
+    page.BackgroundTransparency = 1
+    page.ScrollBarThickness = 6
+    page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    page.Visible = (i == 1)
+    page.Parent = tabHolder
+
+    tabs[i] = tabButton
+    pages[i] = page
+
+    tabButton.MouseButton1Click:Connect(function()
+        stopActiveCoroutines()
+        for j, p in ipairs(pages) do
+            p.Visible = (j == i)
+        end
+    end)
+end
+
+-- Open/Close button
+local openButton = Instance.new("TextButton")
+openButton.Size = UDim2.new(0,50,0,50)
+openButton.Position = UDim2.new(0.5,-25,0,10)
+openButton.Text = "C"
+openButton.TextColor3 = Color3.fromRGB(255,255,255)
+openButton.Font = Enum.Font.GothamBlack
+openButton.TextScaled = true
+openButton.Parent = screenGui
+makeDraggable(openButton)
+
+local openGradient = Instance.new("UIGradient")
+openGradient.Color = ColorSequence.new(Color3.fromRGB(128,0,128), Color3.fromRGB(0,0,0))
+openGradient.Rotation = 90
+openGradient.Parent = openButton
+
+local openCorner = Instance.new("UICorner")
+openCorner.CornerRadius = UDim.new(0,10)
+openCorner.Parent = openButton
+
+local guiOpen = false
+openButton.MouseButton1Click:Connect(function()
+    guiOpen = not guiOpen
+    mainFrame.Visible = guiOpen
+    if not guiOpen then stopActiveCoroutines() end
+end)
+
+-- Pages are ready for features using createFeature(page, "Name", true/false)--// CinX Hub - Features Script 1 (Tabs 1-4) \\--
+
+local Players = game:GetService("Players")
+local Lighting = game:GetService("Lighting")
+local player = Players.LocalPlayer
+local playerChar = player.Character or player.CharacterAdded:Wait()
+local humanoid = playerChar:WaitForChild("Humanoid")
+local hrp = playerChar:WaitForChild("HumanoidRootPart")
+
+-- Active coroutines tracker
+local activeCoroutines = {}
+
+local function addCoroutine(func)
+    local co = coroutine.wrap(func)
+    table.insert(activeCoroutines, co)
+    co()
+end
+
+--========================
+-- PLAYER TAB FEATURES
+--========================
+local playerPage = pages[1]
+
+local speedFrame, speedBox = createFeature(playerPage, "WalkSpeed", false)
+speedBox.FocusLost:Connect(function()
+    local val = tonumber(speedBox.Text)
+    if val then humanoid.WalkSpeed = val end
+end)
+
+local jumpFrame, jumpBox = createFeature(playerPage, "JumpPower", false)
+jumpBox.FocusLost:Connect(function()
+    local val = tonumber(jumpBox.Text)
+    if val then humanoid.JumpPower = val end
+end)
+
+local flyFrame, flyBox = createFeature(playerPage, "Fly (Y/N)", false)
+flyBox.FocusLost:Connect(function()
+    local val = flyBox.Text:lower()
+    local bv = hrp:FindFirstChild("BodyVelocity")
+    if val == "y" then
+        if not bv then
+            bv = Instance.new("BodyVelocity")
+            bv.MaxForce = Vector3.new(1e5,1e5,1e5)
+            bv.Velocity = Vector3.new(0,0,0)
+            bv.Parent = hrp
+        end
+    elseif bv then
+        bv:Destroy()
+    end
+end)
+
+local invisFrame, invisBox = createFeature(playerPage, "Invisibility (Y/N)", false)
+invisBox.FocusLost:Connect(function()
+    local val = invisBox.Text:lower()
+    for _, part in pairs(playerChar:GetDescendants()) do
+        if part:IsA("BasePart") or part:IsA("MeshPart") then
+            part.Transparency = (val == "y") and 1 or 0
+        end
+    end
+end)
+
+local gravityFrame, gravityBox = createFeature(playerPage, "Gravity", false)
+gravityBox.FocusLost:Connect(function()
+    local val = tonumber(gravityBox.Text)
+    if val then workspace.Gravity = val end
+end)
+
+local sitFrame, sitButton = createFeature(playerPage, "Sit", true)
+sitButton.MouseButton1Click:Connect(function() humanoid.Sit = true end)
+
+local resetFrame, resetButton = createFeature(playerPage, "Reset Character", true)
+resetButton.MouseButton1Click:Connect(function() player:LoadCharacter() end)
+
+--========================
+-- TELEPORT TAB FEATURES
+--========================
+local teleportPage = pages[2]
+
+local tpFrame, tpBox = createFeature(teleportPage, "Teleport to Coordinates (x y z)", false)
+tpBox.FocusLost:Connect(function()
+    local coords = {}
+    for num in string.gmatch(tpBox.Text,"%-?%d+%.?%d*") do
+        table.insert(coords, tonumber(num))
+    end
+    if #coords == 3 then hrp.CFrame = CFrame.new(coords[1],coords[2],coords[3]) end
+end)
+
+local tpPlayerFrame, tpPlayerBox = createFeature(teleportPage, "Teleport to Player", false)
+tpPlayerBox.FocusLost:Connect(function()
+    local target = Players:FindFirstChild(tpPlayerBox.Text)
+    if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+        hrp.CFrame = target.Character.HumanoidRootPart.CFrame
+    end
+end)
+
+local spawnFrame, spawnTPButton = createFeature(teleportPage, "Teleport to Spawn", true)
+spawnTPButton.MouseButton1Click:Connect(function()
+    hrp.CFrame = CFrame.new(Vector3.new(0,5,0))
+end)
+
+local randomFrame, randomTPButton = createFeature(teleportPage, "Teleport to Random Player", true)
+randomTPButton.MouseButton1Click:Connect(function()
+    local all = Players:GetPlayers()
+    local target = all[math.random(1,#all)]
+    if target ~= player and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+        hrp.CFrame = target.Character.HumanoidRootPart.CFrame
+    end
+end)
+
+local mouseFrame, mouseTPButton = createFeature(teleportPage, "Teleport to Mouse", true)
+mouseTPButton.MouseButton1Click:Connect(function()
+    local mouse = player:GetMouse()
+    if mouse.Hit then
+        hrp.CFrame = CFrame.new(mouse.Hit.Position + Vector3.new(0,3,0))
+    end
+end)
+
+--========================
+-- WORLD TAB FEATURES
+--========================
+local worldPage = pages[3]
+
+local timeFrame, timeBox = createFeature(worldPage, "Time of Day", false)
+timeBox.FocusLost:Connect(function() Lighting.TimeOfDay = timeBox.Text end)
+
+local noclipFrame, noclipBox = createFeature(worldPage, "NoClip (Y/N)", false)
+noclipBox.FocusLost:Connect(function()
+    local val = noclipBox.Text:lower()
+    if val == "y" then
+        addCoroutine(function()
+            while true do
+                for _, part in pairs(playerChar:GetDescendants()) do
+                    if part:IsA("BasePart") then part.CanCollide = false end
+                end
+                wait(0.1)
+            end
+        end)
+    else
+        for _, part in pairs(playerChar:GetDescendants()) do
+            if part:IsA("BasePart") then part.CanCollide = true end
+        end
+    end
+end)
+
+local fogFrame, fogBox = createFeature(worldPage, "Fog End", false)
+fogBox.FocusLost:Connect(function()
+    local val = tonumber(fogBox.Text)
+    if val then Lighting.FogEnd = val end
+end)
+
+local weatherFrame, weatherBox = createFeature(worldPage, "Weather (Rain/Clear)", false)
+weatherBox.FocusLost:Connect(function()
+    local val = weatherBox.Text:lower()
+    if val == "rain" then
+        print("Rain effect activated (placeholder)")
+    elseif val == "clear" then
+        print("Clear weather activated")
+    end
+end)
+
+--========================
+-- VISUALS TAB FEATURES
+--========================
+local visualsPage = pages[4]
+
+local espFrame, espButton = createFeature(visualsPage, "ESP Boxes", true)
+espButton.MouseButton1Click:Connect(function()
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            if not plr.Character.HumanoidRootPart:FindFirstChild("ESPBox") then
+                local box = Instance.new("BoxHandleAdornment")
+                box.Name = "ESPBox"
+                box.Adornee = plr.Character.HumanoidRootPart
+                box.Size = Vector3.new(2,5,1)
+                box.Transparency = 0.5
+                box.Color3 = Color3.new(1,0,0)
+                box.AlwaysOnTop = true
+                box.Parent = plr.Character.HumanoidRootPart
+            end
+        end
+    end
+end)
+
+local chamsFrame, chamsButton = createFeature(visualsPage, "Chams", true)
+chamsButton.MouseButton1Click:Connect(function()
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= player and plr.Character then
+            for _, part in pairs(plr.Character:GetDescendants()) do
+                if part:IsA("BasePart") then part.Color = Color3.new(0,1,0) end
+            end
+        end
+    end
+end)
+
+local highlightFrame, highlightButton = createFeature(visualsPage, "Highlight Player", true)
+highlightButton.MouseButton1Click:Connect(function()
+    local targetName = "SomePlayer" -- Replace with input
+    local target = Players:FindFirstChild(targetName)
+    if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+        local hl = Instance.new("Highlight")
+        hl.FillColor = Color3.fromRGB(255,255,0)
+        hl.Parent = target.Character
+    end
+end)
+
+local tracerFrame, tracerButton = createFeature(visualsPage, "Tracers", true)
+tracerButton.MouseButton1Click:Connect(function()
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            local attachment0 = Instance.new("Attachment", hrp)
+            local attachment1 = Instance.new("Attachment", plr.Character.HumanoidRootPart)
+            local beam = Instance.new("Beam")
+            beam.Attachment0 = attachment0
+            beam.Attachment1 = attachment1
+            beam.Color = ColorSequence.new(Color3.fromRGB(255,0,0))
+            beam.Width0 = 0.1
+            beam.Width1 = 0.1
+            beam.FaceCamera = true
+            beam.Parent = hrp
+        end
+    end
+end)
+
+local nameTagsFrame, nameTagsButton = createFeature(visualsPage, "Name Tags", true)
+nameTagsButton.MouseButton1Click:Connect(function()
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= player and plr.Character and not plr.Character:FindFirstChild("NameTag") then
+            local head = plr.Character:FindFirstChild("Head")
+            if head then
+                local billboard = Instance.new("BillboardGui")
+                billboard.Name = "NameTag"
+                billboard.Adornee = head
+                billboard.Size = UDim2.new(0,100,0,50)
+                billboard.StudsOffset = Vector3.new(0,2,0)
+                billboard.AlwaysOnTop = true
+                billboard.Parent = plr.Character
+
+                local text = Instance.new("TextLabel")
+                text.Size = UDim2.new(1,0,1,0)
+                text.BackgroundTransparency = 1
+                text.Text = plr.Name
+                text.TextColor3 = Color3.fromRGB(255,255,255)
+                text.Font = Enum.Font.GothamBold
+                text.TextScaled = true
+                text.Parent = billboard
+            end
+        end
+    end
+end)--// CinX Hub - Features Script 2 (Tabs 5-8) \\--
+
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local playerChar = player.Character or player.CharacterAdded:Wait()
+local hrp = playerChar:WaitForChild("HumanoidRootPart")
+
+-- Active coroutines tracker
+local activeCoroutines = {}
+
+local function addCoroutine(func)
+    local co = coroutine.wrap(func)
+    table.insert(activeCoroutines, co)
+    co()
+end
+
+--========================
+-- FUN TAB FEATURES
+--========================
+local funPage = pages[5]
+
+local vanishFrame, vanishButton = createFeature(funPage, "Vanish (5s)", true)
+vanishButton.MouseButton1Click:Connect(function()
+    for _, part in pairs(playerChar:GetDescendants()) do
+        if part:IsA("BasePart") or part:IsA("MeshPart") then
+            part.Transparency = 1
+        end
+    end
+    wait(5)
+    for _, part in pairs(playerChar:GetDescendants()) do
+        if part:IsA("BasePart") or part:IsA("MeshPart") then
+            part.Transparency = 0
+        end
+    end
+end)
+
+local rainbowFrame, rainbowButton = createFeature(funPage, "Rainbow Parts", true)
+rainbowButton.MouseButton1Click:Connect(function()
+    addCoroutine(function()
+        while true do
+            for _, part in pairs(playerChar:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.Color = Color3.fromHSV(tick()%5/5,1,1)
+                end
+            end
+            wait(0.1)
+        end
+    end)
+end)
+
+local punchFrame, punchButton = createFeature(funPage, "Fake Punch", true)
+punchButton.MouseButton1Click:Connect(function()
+    print("You punched the air!")
+end)
+
+--========================
+-- ADMIN TAB FEATURES
+--========================
+local adminPage = pages[6]
+
+local kickFrame, kickBox = createFeature(adminPage, "Kick Player (Name)", false)
+kickBox.FocusLost:Connect(function()
+    print("Pretending to kick player:", kickBox.Text)
+end)
+
+local banFrame, banBox = createFeature(adminPage, "Ban Player (Name)", false)
+banBox.FocusLost:Connect(function()
+    print("Pretending to ban player:", banBox.Text)
+end)
+
+local killFrame, killBox = createFeature(adminPage, "Kill Player (Name)", false)
+killBox.FocusLost:Connect(function()
+    local target = Players:FindFirstChild(killBox.Text)
+    if target and target.Character and target.Character:FindFirstChild("Humanoid") then
+        target.Character.Humanoid.Health = 0
+    end
+end)
+
+--========================
+-- EXECUTOR TAB FEATURES
+--========================
+local executorPage = pages[7]
+
+local codeFrame, codeBox = createFeature(executorPage, "Local Code Executor", false)
+local runFrame, runButton = createFeature(executorPage, "Run", true)
+runButton.MouseButton1Click:Connect(function()
+    local code = codeBox.Text
+    local func, err = loadstring(code)
+    if func then
+        func()
+    else
+        warn("Code error:", err)
+    end
+end)
+
+--========================
+-- MISC TAB FEATURES
+--========================
+local miscPage = pages[8]
+
+local upFrame, upButton = createFeature(miscPage, "TP Up", true)
+upButton.MouseButton1Click:Connect(function()
+    hrp.CFrame = hrp.CFrame + Vector3.new(0,10,0)
+end)
+
+local downFrame, downButton = createFeature(miscPage, "TP Down", true)
+downButton.MouseButton1Click:Connect(function()
+    hrp.CFrame = hrp.CFrame - Vector3.new(0,10,0)
+end)
+
+local spawnPartsFrame, spawnPartsButton = createFeature(miscPage, "Spawn Parts", true)
+spawnPartsButton.MouseButton1Click:Connect(function()
+    for i = 1,10 do
+        local part = Instance.new("Part")
+        part.Size = Vector3.new(2,2,2)
+        part.Position = hrp.Position + Vector3.new(math.random(-10,10),math.random(0,10),math.random(-10,10))
+        part.Anchored = true
+        part.Parent = workspace
+    end
+end)
+
+local colorFrame, colorBox = createFeature(miscPage, "Set Color (R,G,B)", false)
+colorBox.FocusLost:Connect(function()
+    local r,g,b = colorBox.Text:match("(%d+),(%d+),(%d+)")
+    if r and g and b then
+        for _, part in pairs(playerChar:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.Color = Color3.fromRGB(tonumber(r),tonumber(g),tonumber(b))
+            end
+        end
+    end
+end)
+
+local rainbowGuiFrame, rainbowGuiButton = createFeature(miscPage, "Rainbow GUI", true)
+rainbowGuiButton.MouseButton1Click:Connect(function()
+    addCoroutine(function()
+        while true do
+            for _, gui in pairs(player.PlayerGui:GetDescendants()) do
+                if gui:IsA("Frame") or gui:IsA("TextButton") or gui:IsA("TextLabel") then
+                    gui.BackgroundColor3 = Color3.fromHSV(tick()%5/5,1,1)
+                end
+            end
+            wait(0.1)
+        end
+    end)
+end)
